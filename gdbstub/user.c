@@ -692,6 +692,7 @@ int gdb_breakpoint_insert(CPUState *cs, int type, vaddr addr, vaddr len)
 {
     CPUState *cpu;
     int err = 0;
+    int wp_flags = 0;
 
     switch (type) {
     case GDB_BREAKPOINT_SW:
@@ -703,10 +704,29 @@ int gdb_breakpoint_insert(CPUState *cs, int type, vaddr addr, vaddr len)
             }
         }
         return err;
+    case GDB_WATCHPOINT_READ:
+        wp_flags = BP_MEM_READ;
+        break;
+    case GDB_WATCHPOINT_WRITE:
+        wp_flags = BP_MEM_WRITE;
+        break;
+    case GDB_WATCHPOINT_ACCESS:
+        wp_flags = BP_MEM_ACCESS;
+        break;
     default:
-        /* user-mode doesn't support watchpoints */
         return -ENOSYS;
     }
+    if (wp_flags) {
+        CPU_FOREACH(cpu) {
+            err = cpu_watchpoint_insert(cpu, addr, len, wp_flags, NULL);
+            if (err) {
+                break;
+            }
+        }
+        return err;
+    }
+
+    return -ENOSYS;
 }
 
 int gdb_breakpoint_remove(CPUState *cs, int type, vaddr addr, vaddr len)
@@ -724,10 +744,29 @@ int gdb_breakpoint_remove(CPUState *cs, int type, vaddr addr, vaddr len)
             }
         }
         return err;
+    case GDB_WATCHPOINT_READ:
+        wp_flags = BP_MEM_READ;
+        break;
+    case GDB_WATCHPOINT_WRITE:
+        wp_flags = BP_MEM_WRITE;
+        break;
+    case GDB_WATCHPOINT_ACCESS:
+        wp_flags = BP_MEM_ACCESS;
+        break;
     default:
-        /* user-mode doesn't support watchpoints */
         return -ENOSYS;
     }
+    if (wp_flags) {
+        CPU_FOREACH(cpu) {
+            err = cpu_watchpoint_remove(cpu, addr, len, wp_flags);
+            if (err) {
+                break;
+            }
+        }
+        return err;
+    }
+
+    return -ENOSYS;
 }
 
 void gdb_breakpoint_remove_all(CPUState *cs)
